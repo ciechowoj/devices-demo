@@ -13,7 +13,7 @@ namespace demo {
     udp_server_t(asio::io_context& io_context, short port)
       : _socket(io_context, udp::endpoint(udp::v4(), port)) {
       static_assert(default_message_buffer_size < _max_size);
-      do_receive();
+      io_context.post([this] { do_receive(); });
     }
 
     virtual void on_receive(const std::string_view& message) = 0;
@@ -102,18 +102,38 @@ namespace demo {
   class message_counter_t : public message_server_t {
   public:
     message_counter_t(asio::io_context& io_context)
-      : message_server_t(io_context) {
+      : message_server_t(io_context)
+      , _timer(io_context) {
+      _received_message_count = 0;
+      _lost_message_count = 0;
+      _timer.expires_after(std::chrono::seconds(1));
+      _timer.async_wait([this] (auto ec) { on_timer(ec); });
     }
 
     void on_receive(const message_t& message, uint64_t prev_serial_id) override {
-      ++_message_count;
+      ++_received_message_count;
+      _lost_message_count += std::max(uint64_t(1), message.serial_id - prev_serial_id) - 1;
+    }
 
+    void on_timer(const std::error_code& ec) {
+      if (!ec) {
+        std::cout
+          << R"({ "received": )"
+          << _received_message_count
+          << R"(, "lost": )"
+          << _lost_message_count
+          << " }"
+          << std::endl;
+      }
 
-      std::cout << serialize_message(message) << "\n" << prev_serial_id << std::endl;
+      _timer.expires_at(_timer.expiry() + asio::chrono::seconds(1));
+      _timer.async_wait([this] (auto ec) { on_timer(ec); });
     }
 
   private:
-    std::atomic<uint64_t> _message_count;
+    asio::steady_timer _timer;
+    std::atomic<uint64_t> _received_message_count;
+    std::atomic<uint64_t> _lost_message_count;
   };
 
 }
