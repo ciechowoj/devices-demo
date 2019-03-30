@@ -8,7 +8,7 @@
 
 namespace demo {
 
-  void serialize_message(
+  size_t serialize_message(
     const message_t& message,
     char* buffer,
     size_t buffer_size) {
@@ -30,6 +30,16 @@ namespace demo {
       message.timestamp,
       message.measurement,
       '}');
+
+    if (result < 0) {
+      throw std::runtime_error("Serialization error!");
+    }
+
+    if (result >= buffer_size) {
+      throw std::runtime_error("Buffer overrun!");
+    }
+
+    return result;
   }
 
   [[noreturn]] void parse_error() {
@@ -105,6 +115,12 @@ namespace demo {
 
     itr = jtr;
     result = local_result;
+  }
+
+  std::string serialize_message(const message_t& message) {
+    char buffer[default_message_buffer_size];
+    size_t size = serialize_message(message, buffer, default_message_buffer_size);
+    return std::string(buffer, buffer + size);
   }
 
   message_t deserialize_message(const char* buffer, size_t buffer_size) {

@@ -92,3 +92,17 @@ unittest("Throw if any of the fields is missing.") {
     R"({"device_id":1,"timestamp":1844674,"serial_id":2})";
   assert_throws([&] { deserialize_message(message3, std::strlen(message3)); });
 }
+
+unittest("default_message_buffer_size is correct") {
+  // Assuming one doesn't go crazy with the whitespaces in the json,
+  // the default_message_buffer_size should fit all possible messages.
+
+  auto message3 =
+    R"({"device_id":18446744073709551614,"timestamp":18446744073709551614,"serial_id":18446744073709551614,"measurement":-9223372036854775806})";
+
+  assert_true(default_message_buffer_size > std::strlen(message3));
+
+  deserialize_message(message3, std::strlen(message3));
+}
+
+

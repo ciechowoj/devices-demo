@@ -2,6 +2,7 @@
 #include <iostream>
 #include <asio.hpp>
 #include <message.hxx>
+#include <unordered_map>
 
 namespace demo {
 
@@ -10,53 +11,92 @@ namespace demo {
   class udp_server_t {
   public:
     udp_server_t(asio::io_context& io_context, short port)
-      : socket_(io_context, udp::endpoint(udp::v4(), port)) {
+      : _socket(io_context, udp::endpoint(udp::v4(), port)) {
+      static_assert(default_message_buffer_size < _max_size);
       do_receive();
-    }
-
-    void do_receive() {
-
-      auto closure = [this](std::error_code ec, std::size_t bytes_recvd) {
-        if (!ec && bytes_recvd > 0) {
-          data_[bytes_recvd] = 0;
-
-          std::cout << data_ << std::endl;
-        }
-
-        do_receive();
-      };
-
-      socket_.async_receive_from(
-        asio::buffer(data_, max_length),
-        sender_endpoint_,
-        closure);
     }
 
     virtual void on_receive(const std::string_view& message) = 0;
 
   private:
-    udp::socket socket_;
-    udp::endpoint sender_endpoint_;
-    enum { max_length = 1024 };
-    char data_[max_length];
+    void do_receive() {
+      auto closure = [this](std::error_code ec, std::size_t bytes_recvd) {
+        if (!ec && bytes_recvd > 0) {
+          on_receive(std::string_view(_data, bytes_recvd));
+        }
+
+        do_receive();
+      };
+
+      _socket.async_receive_from(
+        asio::buffer(_data, _max_size),
+        _sender_endpoint,
+        closure);
+    }
+
+    udp::socket _socket;
+    udp::endpoint _sender_endpoint;
+    static constexpr size_t _max_size = 1024;
+    char _data[_max_size];
   };
 
   class message_server_t : private udp_server_t {
   public:
     message_server_t(asio::io_context& io_context)
-      : udp_server_t(io_context, _port_number) {
-      do_receive();
-    }
+      : udp_server_t(io_context, _port_number) { }
 
-    virtual void on_receive(const message_t& message) = 0;
+    virtual void on_receive(const message_t& message, uint64_t prev_serial_id) = 0;
 
   private:
-    static constexpr short _port_number = 1911;
+    struct _device_state_t {
+      uint64_t serial_id = 0;
+      uint64_t timestamp = 0;
+    };
 
-    void on_receive(const std::string_view& message) override {
+    void on_receive(const std::string_view& raw_message) override {
+      auto message = deserialize_message(raw_message.data(), raw_message.size());
 
+      bool repeated = false;
+
+      auto prev_serial_id = message.serial_id;
+
+      if (auto lock = std::lock_guard<std::mutex>(_latest_serial_id_mutex); true) {
+        auto itr = _latest_serial_ids.find(message.device_id);
+
+        if (itr == _latest_serial_ids.end()) {
+          _device_state_t state;
+          state.serial_id = message.serial_id;
+          state.timestamp = message.timestamp;
+          _latest_serial_ids.emplace(message.device_id, state);
+        }
+        else {
+          if (itr->second.serial_id < message.serial_id && itr->second.timestamp <= message.timestamp) {
+            prev_serial_id = itr->second.serial_id;
+            itr->second.serial_id = message.serial_id;
+            itr->second.timestamp = message.timestamp;
+          }
+          else if (itr->second.serial_id >= message.serial_id && itr->second.timestamp < message.timestamp) {
+            // if timestamps are consecutive and serial_ids reversed
+            // it means that the device was restarted and the latest serial_id
+            // stored in the hash map is invalid
+            itr->second.serial_id = message.serial_id;
+            itr->second.timestamp = message.timestamp;
+          }
+          else {
+            repeated = true;
+          }
+        }
+      }
+
+      if (!repeated) {
+        on_receive(message, prev_serial_id);
+      }
     }
 
+    std::unordered_map<uint64_t, _device_state_t> _latest_serial_ids;
+    std::mutex _latest_serial_id_mutex;
+
+    static constexpr short _port_number = 1911;
   };
 
   class message_counter_t : public message_server_t {
@@ -65,9 +105,11 @@ namespace demo {
       : message_server_t(io_context) {
     }
 
-
-    void on_receive(const message_t& message) override {
+    void on_receive(const message_t& message, uint64_t prev_serial_id) override {
       ++_message_count;
+
+
+      std::cout << serialize_message(message) << "\n" << prev_serial_id << std::endl;
     }
 
   private:

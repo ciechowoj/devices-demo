@@ -5,6 +5,8 @@ project(devices-demo C CXX)
 include(${CMAKE_BINARY_DIR}/conanbuildinfo.cmake)
 conan_basic_setup()
 
+add_compile_definitions(DEMO_PORT="1911")
+
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
 add_executable(device device.cxx message.cxx)
