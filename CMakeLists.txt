@@ -20,5 +20,3 @@ target_link_libraries(test ${CONAN_LIBS})
 set_property(TARGET device PROPERTY CXX_STANDARD 17)
 set_property(TARGET server PROPERTY CXX_STANDARD 17)
 set_property(TARGET test PROPERTY CXX_STANDARD 17)
-
-
