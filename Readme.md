@@ -45,7 +45,7 @@ pip3 install setuptools # for conan
 pip3 install conan
 ```
 ## The steps to build the solution:
-After above tools are installed, below are the commands required to build the solution. Conan will install two dependencies ASIO library of async programming and Haste-UnitTest for unit tests. Then the makefiles are generated using cmake and finally the project is built using make.
+After above tools are installed, below are the commands required to build the solution. Conan will install two dependencies ASIO library for async programming and Haste-UnitTest for unit tests. Then, the makefiles are generated using cmake and finally the project is built using make (see `./build.sh`).
 
 ```
 conan remote add ciechowoj https://api.bintray.com/conan/ciechowoj/Haste
