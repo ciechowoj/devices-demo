@@ -1,5 +1,6 @@
 #include <cstdlib>
 #include <iostream>
+#include <thread>
 #include <asio.hpp>
 #include <message.hxx>
 #include <unordered_map>
@@ -7,6 +8,8 @@
 namespace demo {
 
   using asio::ip::udp;
+
+  auto global_cio_mutex = std::mutex();
 
   class udp_server_t {
   public:
@@ -117,13 +120,15 @@ namespace demo {
 
     void on_timer(const std::error_code& ec) {
       if (!ec) {
-        std::cout
-          << R"({ "received": )"
-          << _received_message_count
-          << R"(, "lost": )"
-          << _lost_message_count
-          << " }"
-          << std::endl;
+        if (auto lock = std::lock_guard<std::mutex>(global_cio_mutex); true) {
+          std::cout
+            << R"({ "received": )"
+            << _received_message_count
+            << R"(, "lost": )"
+            << _lost_message_count
+            << " }"
+            << std::endl;
+        }
       }
 
       _timer.expires_at(_timer.expiry() + asio::chrono::seconds(1));
@@ -135,7 +140,6 @@ namespace demo {
     std::atomic<uint64_t> _received_message_count;
     std::atomic<uint64_t> _lost_message_count;
   };
-
 }
 
 int main(int argc, char* argv[]) {
@@ -144,7 +148,20 @@ int main(int argc, char* argv[]) {
 
     demo::message_counter_t server(io_context);
 
-    io_context.run();
+
+    std::vector<std::thread> thread_pool;
+    size_t num_hardware_threads = std::thread::hardware_concurrency();
+    size_t num_threads = std::max(num_hardware_threads, size_t(1));
+
+    for (size_t i = 0; i < num_threads; ++i) {
+      thread_pool.emplace_back([&, i] {
+        io_context.run();
+      });
+    }
+
+    for (auto&& thread : thread_pool) {
+      thread.join();
+    }
   }
   catch (std::exception& e) {
     std::cerr << "Exception: " << e.what() << "\n";

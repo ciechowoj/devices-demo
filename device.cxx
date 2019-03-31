@@ -64,7 +64,7 @@ int main(int argc, char* argv[]) {
     char* end = nullptr;
     const uint64_t device_id = std::strtoull(argv[2], &end, 10);
     const double period = std::strtod(argv[3], &end);
-    const bool print = std::strcmp(argv[4], "true") == 0;
+    const bool print = argc > 4 && std::strcmp(argv[4], "true") == 0;
 
     auto resolver = udp::resolver(io_context);
     auto endpoints = resolver.resolve(udp::v4(), host, port);
