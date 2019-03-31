@@ -71,3 +71,5 @@ open two (or more) terminals and in every of them run (it's important for the de
 ```
 
 observe the messages logged by the server.
+
+![screenshot](https://github.com/ciechowoj/devices-demo/blob/master/screenshot-or-it-didn't-happen.jpg)
