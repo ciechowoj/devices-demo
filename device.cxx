@@ -53,6 +53,13 @@ uint64_t monotonic_ns() {
 }
 
 int main(int argc, char* argv[]) {
+  if (argc < 4) {
+    std::cout << "Usage: device <host> <device_id> <period> [<enable-logging>]" << std::endl;
+    std::cout << "Example:" << std::endl;
+    std::cout << "    device localhost 42 0.01 false" << std::endl;
+    return 1;
+  }
+
   try {
     asio::io_context io_context;
 

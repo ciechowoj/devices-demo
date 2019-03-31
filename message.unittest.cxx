@@ -6,6 +6,14 @@ using namespace demo;
 using namespace haste;
 
 unittest("Test serialize/deserialize roundtrip.") {
+  char buffer[3];
+
+  auto message = message_t { 1, 2, 3, 4 };
+
+  assert_throws([&] { serialize_message(message, buffer, sizeof(buffer)); } );
+}
+
+unittest("Test serialize/deserialize roundtrip.") {
   char buffer[1024];
 
   auto message = message_t { 1, 2, 3, 4 };

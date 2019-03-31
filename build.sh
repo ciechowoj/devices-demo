@@ -1,5 +1,3 @@
-build.sh
-
 mkdir build
 cd build
 conan install .. --settings compiler.version=8 --build Haste-UnitTest
